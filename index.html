@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>JSON-LD UI enhancer</title>
+    <style>
+
+    </style>
+  </head>
+  <body>
+    <h1>JSON-LD UI enhancer Demo</h1>
+    <div id="feature"></div>
+    <script type="module">
+      import jsonUIUtils from "./src/index.ts";
+      jsonUIUtils.loadFeature('https://ogcincubator.github.io/bblocks-examples/build/tests/bbr/examples/observation/vectorObservationFeature/example_1_1.jsonld')
+              .then(({feature, context}) => {
+                const rootElem = document.getElementById('feature');
+                jsonUIUtils.createPropertiesTable(feature, rootElem);
+                jsonUIUtils.augment(rootElem, context, {
+                  fallbackRainbowInstance: 'https://defs-hosted.opengis.net/prez-hosted-b/object',
+                });
+              });
+    </script>
+  </body>
+</html>
