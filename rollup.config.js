@@ -58,6 +58,12 @@ export default [{
       format: "esm",
       inlineDynamicImports: true,
     },
+    {
+      file: "dist/index.cjs.js",
+      format: "cjs",
+      exports: "named",
+      inlineDynamicImports: true,
+    },
   ],
   plugins: [
     resolve({browser: true, preferBuiltins: false}),

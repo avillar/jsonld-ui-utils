@@ -1,8 +1,10 @@
 {
-  "main": "dist/index.cjs.js",
+  "name": "jsonld-ui-utils",
   "version": "0.1.0",
   "type": "module",
+  "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
+  "browser": "dist/jsonld-ui-utils.min.js",
   "exports": {
     "import": "./dist/index.esm.js",
     "require": "./dist/index.cjs.js"
@@ -28,7 +30,8 @@
   "scripts": {
     "build": "rollup -c",
     "dev": "vite --open",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prepare": "rollup -c"
   },
   "peerDependencies": {
     "rdflib": "^2.3.0"
