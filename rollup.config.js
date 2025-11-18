@@ -2,27 +2,40 @@ import typescript from "@rollup/plugin-typescript";
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import babel from "@rollup/plugin-babel";
+import json from '@rollup/plugin-json';
+import polyfillNode from 'rollup-plugin-polyfill-node';
+import {terser} from "rollup-plugin-terser";
 
-export default {
+const EXTERNALS = ["rdflib"];
+const GLOBALS = {
+  "rdflib": "$rdf",
+};
+
+
+export default [{
   input: "src/index.ts",
+  external: EXTERNALS,
   output: [
     {
-      file: "dist/index.esm.js",
-      format: "esm",
-    },
-    {
-      file: "dist/index.cjs.js",
-      format: "cjs",
-    },
-    {
-      file: "dist/index.iife.js",
+      file: "dist/jsonld-ui-utils.min.js",
       format: "iife",
       name: "jsonldUIUtils",
+      globals: GLOBALS,
+      inlineDynamicImports: true,
+      exports: "named",
     }
   ],
   plugins: [
+    polyfillNode(),
     resolve(),
-    commonjs(),
+    json({
+      preferConst: true, // optional: smaller bundles
+      compact: true,     // optional
+    }),
+    commonjs({
+      include: /node_modules/,
+      transformMixedEsModules: true, // important when deps ship mixed ESM/CJS
+    }),
     typescript({tsconfig: "./tsconfig.json"}),
     babel({
       babelHelpers: "bundled",
@@ -34,5 +47,35 @@ export default {
         }]
       ]
     }),
-  ]
-};
+    terser(),
+  ],
+}, {
+  input: "src/index.ts",
+  external: EXTERNALS,
+  output: [
+    {
+      file: "dist/index.esm.js",
+      format: "esm",
+      inlineDynamicImports: true,
+    },
+  ],
+  plugins: [
+    resolve({browser: true, preferBuiltins: false}),
+    json({preferConst: true, compact: true}),
+    commonjs({include: /node_modules/, transformMixedEsModules: true}),
+    typescript({tsconfig: "./tsconfig.json"}),
+    babel({
+      babelHelpers: "bundled",
+      presets: [
+        [
+          "@babel/preset-env",
+          {
+            targets: {node: "16"}, // or browserslist for libraries
+            useBuiltIns: false,
+          },
+        ],
+      ],
+      extensions: [".js", ".ts"],
+    }),
+  ],
+}];

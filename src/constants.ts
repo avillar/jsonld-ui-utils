@@ -1,12 +1,12 @@
-import * as $rdf from 'rdflib';
+import {Namespace} from 'rdflib';
 
-export const SKOS = $rdf.Namespace('http://www.w3.org/2004/02/skos/core#');
-export const RDFS = $rdf.Namespace('http://www.w3.org/2000/01/rdf-schema#')
-export const RDF = $rdf.Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
-export const DCT = $rdf.Namespace('http://purl.org/dc/terms/');
-export const DC = $rdf.Namespace('http://purl.org/dc/elements/1.1/');
-export const SDO = $rdf.Namespace('https://schema.org/');
-export const FOAF = $rdf.Namespace('http://xmlns.com/foaf/0.1/');
+export const SKOS = Namespace('http://www.w3.org/2004/02/skos/core#');
+export const RDFS = Namespace('http://www.w3.org/2000/01/rdf-schema#')
+export const RDF = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
+export const DCT = Namespace('http://purl.org/dc/terms/');
+export const DC = Namespace('http://purl.org/dc/elements/1.1/');
+export const SDO = Namespace('https://schema.org/');
+export const FOAF = Namespace('http://xmlns.com/foaf/0.1/');
 
 export const labelPredicates = [
   SKOS('prefLabel'),
