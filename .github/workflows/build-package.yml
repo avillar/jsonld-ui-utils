@@ -22,6 +22,8 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
+        env:
+          YARN_IGNORE_PREPARE: 'true'
         run: yarn install --frozen-lockfile
 
       - name: Build project

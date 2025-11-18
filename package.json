@@ -31,7 +31,7 @@
     "build": "rollup -c",
     "dev": "vite --open",
     "preview": "vite preview",
-    "prepare": "rollup -c"
+    "prepare": "if [ \"$YARN_IGNORE_PREPARE\" != \"true\" ]; then rollup -c; fi"
   },
   "peerDependencies": {
     "rdflib": "^2.3.0"
