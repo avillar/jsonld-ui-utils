@@ -23,6 +23,7 @@ export default [{
       globals: GLOBALS,
       inlineDynamicImports: true,
       exports: "named",
+      sourcemap: true,
     }
   ],
   plugins: [
@@ -36,7 +37,7 @@ export default [{
       include: /node_modules/,
       transformMixedEsModules: true, // important when deps ship mixed ESM/CJS
     }),
-    typescript({tsconfig: "./tsconfig.json"}),
+    typescript({tsconfig: "./tsconfig.json", sourceMap: true, inlineSources: true}),
     babel({
       babelHelpers: "bundled",
       presets: [
@@ -57,19 +58,21 @@ export default [{
       file: "dist/index.esm.js",
       format: "esm",
       inlineDynamicImports: true,
+      sourcemap: true,
     },
     {
       file: "dist/index.cjs.js",
       format: "cjs",
       exports: "named",
       inlineDynamicImports: true,
+      sourcemap: true,
     },
   ],
   plugins: [
     resolve({browser: true, preferBuiltins: false}),
     json({preferConst: true, compact: true}),
     commonjs({include: /node_modules/, transformMixedEsModules: true}),
-    typescript({tsconfig: "./tsconfig.json"}),
+    typescript({tsconfig: "./tsconfig.json", sourceMap: true, inlineSources: true}),
     babel({
       babelHelpers: "bundled",
       presets: [
