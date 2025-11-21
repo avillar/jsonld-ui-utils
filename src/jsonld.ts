@@ -32,7 +32,7 @@ const mergeContexts = (definitions: ContextDefinition[]) => {
     return {};
   }
   if (definitions.length === 1) {
-    return definitions[1];
+    return definitions[0];
   }
   let currentContext = definitions[0];
   for (let i = 1; i < definitions.length; i++) {
