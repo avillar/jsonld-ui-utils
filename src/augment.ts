@@ -218,42 +218,6 @@ export async function augment(rootElem: HTMLElement, context: ContextDefinition,
       const valueElem = propElem.parentElement?.querySelector('.object-value') as HTMLElement;
       if (resolvedProperty && '@id' in resolvedProperty && typeof resolvedProperty['@id'] === 'string') {
         const propertyUri = resolvedProperty['@id'];
-        /*propElem.setAttribute('data-uri', propertyUri);
-        propElem.classList.add('resource-loading');
-        fetchResource(propertyUri)
-          .then(resourceData => {
-            let elemToUpdate = propElem.querySelector('.resource-link') as HTMLElement || propElem;
-            if (resourceData.label) {
-              propElem.setAttribute('data-label', resourceData.label);
-              if (options.replaceElements) {
-                elemToUpdate.textContent = resourceData.label;
-              }
-            }
-            if (resourceData.description) {
-              propElem.setAttribute('data-description', resourceData.description);
-              if (options.replaceElements) {
-                elemToUpdate.title = resourceData.description;
-              }
-            }
-            propElem.classList.add('resource-resolved');
-          })
-          .catch(e => {
-            console.error(`Error resolving URI ${propertyUri}: ${e}`, {cause: e});
-            propElem.classList.add('resource-error');
-          })
-          .finally(() => {
-            propElem.classList.remove('resource-loading');
-          });
-          if (options.replaceElements) {
-            const link = document.createElement("a");
-            link.href = propertyUri;
-            link.target = '_blank';
-            link.classList.add('resource-link');
-            while(propElem.firstChild) {
-              link.appendChild(propElem.firstChild);
-            }
-            propElem.appendChild(link);
-          }*/
         updateElement(propElem, propertyUri, mergedOptions.replaceElements);
         if ('@context' in resolvedProperty) {
           newContextStack = [...contextStack, resolvedProperty['@context']!];

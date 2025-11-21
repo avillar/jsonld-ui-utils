@@ -15,6 +15,32 @@ const jsonFetch = async (url: string) => {
   return await response.json() as ContextObject;
 };
 
+const mergeContexts = (definitions: ContextDefinition[]) => {
+  const mergePair = (a: ContextDefinition | null | undefined,
+                     b: ContextDefinition): ContextDefinition => {
+    if (!a || !Object.keys(a).length) {
+      return b;
+    }
+    const result = {...a};
+    for (const [k, v] of Object.entries(b)) {
+      result[k] = v;
+    }
+    return result;
+  };
+
+  if (!definitions.length) {
+    return {};
+  }
+  if (definitions.length === 1) {
+    return definitions[1];
+  }
+  let currentContext = definitions[0];
+  for (let i = 1; i < definitions.length; i++) {
+    currentContext = mergePair(currentContext, definitions[i]);
+  }
+  return currentContext;
+};
+
 
 export async function loadContext(context: Context | ContextObject) {
   const loadedUrls = new Map<string, ContextObject>();
@@ -30,11 +56,6 @@ export async function loadContext(context: Context | ContextObject) {
     }
   };
 
-  const merge = (definitions: ContextDefinition[]) => {
-    // TODO: pending
-    return {};
-  };
-
   const load = async (context: Context, refChain?: string[]): Promise<ContextDefinition> => {
     if (context === null || typeof context === 'undefined') {
       return {};
@@ -42,7 +63,7 @@ export async function loadContext(context: Context | ContextObject) {
     if (Array.isArray(context)) {
       // fetch and merge
       const contextEntries = await Promise.all(context.map(e => load(e, refChain)));
-      return merge(contextEntries);
+      return mergeContexts(contextEntries);
     } else if (typeof context === 'object') {
       await walk(context, refChain);
       return context;
