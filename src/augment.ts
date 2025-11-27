@@ -13,9 +13,9 @@ export interface AugmentOptions extends FetchResourceOptions {
 const defaultAugmentOptions: AugmentOptions = {
   replaceElements: true,
   ...defaultFetchResourceOptions,
-}
+};
 
-export function createPropertiesTable(feature: {[index: string]: any}, container: HTMLElement,
+export function createPropertiesTable(feature: { [index: string]: any }, container: HTMLElement,
                                       options: CreatePropertiesTableOptions = {
                                         propertiesField: 'properties',
                                       }) {
@@ -42,7 +42,7 @@ export function createPropertiesTable(feature: {[index: string]: any}, container
       Object.entries(value).forEach(([k, v]) => {
         const row = document.createElement('tr');
         const keyCell = document.createElement('td');
-        keyCell.classList.add('object-property')
+        keyCell.classList.add('object-property');
         keyCell.setAttribute('data-property', k);
         keyCell.textContent = k;
         row.appendChild(keyCell);
@@ -70,6 +70,9 @@ export async function augment(rootElem: HTMLElement, context: ContextDefinition,
 
   const resolveTerm = (term: string, contextStack: ContextDefinition[],
                        useVocab = true, useBase = false): ExpandedTermDefinition | null => {
+    if (term === '@type') {
+      return {'@id': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'};
+    }
     if (term.indexOf('://') !== -1) {
       return {'@id': term};
     }
@@ -81,7 +84,7 @@ export async function augment(rootElem: HTMLElement, context: ContextDefinition,
         let resolvedId: string;
         if (resolvedTerm === null || typeof resolvedTerm === 'undefined' || typeof resolvedTerm === 'boolean'
           || Array.isArray(resolvedTerm)) {
-          continue
+          continue;
         }
         if (typeof resolvedTerm === 'string') {
           resolvedId = resolvedTerm;
@@ -136,7 +139,7 @@ export async function augment(rootElem: HTMLElement, context: ContextDefinition,
           return NodeFilter.FILTER_ACCEPT;
         }
         return NodeFilter.FILTER_SKIP;
-      }
+      },
     });
     const result: HTMLElement[] = [];
     let cur;
@@ -159,9 +162,10 @@ export async function augment(rootElem: HTMLElement, context: ContextDefinition,
           return NodeFilter.FILTER_REJECT;
         }
         return NodeFilter.FILTER_SKIP;
-      }
+      },
     });
-    while (walker.nextNode()) {}
+    while (walker.nextNode()) {
+    }
     return result;
   };
 
@@ -193,16 +197,16 @@ export async function augment(rootElem: HTMLElement, context: ContextDefinition,
       .finally(() => {
         elem.classList.remove('resource-loading');
       });
-      if (replaceElements) {
-        const link = document.createElement("a");
-        link.href = resourceUri;
-        link.target = '_blank';
-        link.classList.add('resource-link');
-        while(elem.firstChild) {
-          link.appendChild(elem.firstChild);
-        }
-        elem.appendChild(link);
+    if (replaceElements) {
+      const link = document.createElement("a");
+      link.href = resourceUri;
+      link.target = '_blank';
+      link.classList.add('resource-link');
+      while (elem.firstChild) {
+        link.appendChild(elem.firstChild);
       }
+      elem.appendChild(link);
+    }
   };
 
   const augmentInner = (elem: HTMLElement, contextStack: ContextDefinition[]) => {
