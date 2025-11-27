@@ -70,9 +70,6 @@ export async function augment(rootElem: HTMLElement, context: ContextDefinition,
 
   const resolveTerm = (term: string, contextStack: ContextDefinition[],
                        useVocab = true, useBase = false): ExpandedTermDefinition | null => {
-    if (term === '@type') {
-      return {'@id': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'};
-    }
     if (term.indexOf('://') !== -1) {
       return {'@id': term};
     }
@@ -87,6 +84,9 @@ export async function augment(rootElem: HTMLElement, context: ContextDefinition,
           continue;
         }
         if (typeof resolvedTerm === 'string') {
+          if (resolvedTerm === '@type') {
+            return {'@id': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'};
+          }
           resolvedId = resolvedTerm;
           resolvedTerm = {'@id': resolvedTerm};
         } else if (typeof resolvedTerm === 'object' && '@id' in resolvedTerm && typeof resolvedTerm['@id'] === 'string') {
