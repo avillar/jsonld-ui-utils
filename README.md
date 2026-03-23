@@ -123,9 +123,11 @@ During and after augmentation, elements receive additional CSS classes:
 | `replaceElements` | `boolean` | `true` | Replace element text with the resolved label. |
 | `labelPredicates` | `(NamedNode \| string)[]` | SKOS prefLabel, DCT/DC title, SDO/FOAF name, RDFS label | RDF predicates checked when extracting a label. |
 | `descriptionPredicates` | `(NamedNode \| string)[]` | SKOS definition, DCT/DC description, RDFS comment | RDF predicates checked when extracting a description. |
-| `fallbackRainbowInstance` | `string` | — | Base URL of a RAINBOW proxy service used when a direct fetch fails. |
-| `fallbackSparqlEndpoint` | `string` | — | SPARQL endpoint URL used as a last resort (`DESCRIBE <uri>`). |
+| `fallbackRainbowInstances` | `string \| string[]` | — | One or more RAINBOW proxy base URLs tried in order when a direct fetch returns no label. |
+| `fallbackSparqlEndpoints` | `string \| string[]` | — | One or more SPARQL endpoint URLs tried in order as a last resort (`DESCRIBE <uri>`). |
 | `acceptedContentTypes` | `object` | Turtle, N-Triples, RDF/XML, anot+Turtle | RDF content types to accept, mapped to `true` or a normalised type string. |
+
+> **Note:** The singular aliases `fallbackRainbowInstance` and `fallbackSparqlEndpoint` are still accepted for backward compatibility and behave as a single-element list appended after any values provided via the plural options.
 
 ### Lower-level API
 

@@ -7,8 +7,10 @@ import {IndexedFormula} from "rdflib";
 export interface FetchResourceOptions {
   labelPredicates: (NamedNode | string)[],
   descriptionPredicates: (NamedNode | string)[],
-  fallbackRainbowInstance?: string,
-  fallbackSparqlEndpoint?: string,
+  fallbackRainbowInstance?: string,   // deprecated: use fallbackRainbowInstances
+  fallbackRainbowInstances?: string | string[],
+  fallbackSparqlEndpoint?: string,    // deprecated: use fallbackSparqlEndpoints
+  fallbackSparqlEndpoints?: string | string[],
   acceptedContentTypes: { [contentType: string]: boolean | string },
 }
 
@@ -45,76 +47,78 @@ const findMatchingPredicate = (store: IndexedFormula, resourceUrl: string | Name
   }
 }
 
+const toArray = (val?: string | string[]): string[] =>
+  !val ? [] : Array.isArray(val) ? val : [val];
+
 const get_sparql_query = (uri: string) => {
   return `DESCRIBE <${uri}>`;
 }
 
-const actualFetchResource = async (uri: string, options: FetchResourceOptions) => {
-  const acceptHeader = Object.keys(acceptedResourceContentTypes).join(', ');
-  let fetchError = 'unknown error';
-  let response;
+const tryFetchAndParse = async (fetchFn: () => Promise<Response>, uri: string, options: FetchResourceOptions): Promise<ResourceData | null> => {
+  let response: Response;
   try {
-    response = await fetch(uri, {
-      headers: {
-        'Accept': acceptHeader,
-      },
-    });
-  } catch (e) {
-    fetchError = `Error retrieving resource ${uri}: ${e}`;
-  }
-  if (!response?.ok && options.fallbackRainbowInstance) {
-    try {
-      const rainbowURL = new URL(options.fallbackRainbowInstance);
-      rainbowURL.searchParams.set('uri', uri);
-      response = await fetch(rainbowURL, {
-        headers: {
-          'Accept': acceptHeader,
-        },
-      });
-    } catch (e) {
-      fetchError = `Error retrieving resource ${uri} from RAINBOW service at ${options.fallbackRainbowInstance}: ${e}`;
-    }
-  }
-  if (!response?.ok && options.fallbackSparqlEndpoint) {
-    try {
-      const formBody = new URLSearchParams({
-        query: get_sparql_query(uri),
-      });
-      response = await fetch(options.fallbackSparqlEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-type': 'application/x-www-form-urlencoded',
-          'Accept': 'text/turtle',
-        },
-        body: formBody.toString(),
-      });
-    } catch (e) {
-      fetchError = `Error retrieving resource ${uri} from SPARQL endpoint at ${options.fallbackSparqlEndpoint}: ${e}`;
-    }
-  }
-  if (!response?.ok) {
-    const errMsg = response ? `${response.status} - ${response.statusText}` : fetchError;
-    throw new Error(`Error fetching resource data for ${uri}: ${errMsg}`);
+    response = await fetchFn();
+    if (!response.ok) return null;
+  } catch {
+    return null;
   }
   const responseContentType = response.headers.get('content-type')?.replace(/;.*/, '') || 'text/turtle';
   const acceptedContentType = options.acceptedContentTypes[responseContentType] === true
     ? responseContentType
     : options.acceptedContentTypes[responseContentType];
-  if (!acceptedContentType) {
-    throw new Error(`Unknown resource type for ${uri}: ${responseContentType}`);
+  if (!acceptedContentType) return null;
+  try {
+    $rdf.parse(await response.text(), store, uri, acceptedContentType as string);
+  } catch {
+    return null;
   }
-
-  $rdf.parse(await response.text(), store, uri, acceptedContentType);
-
-  if (!store.statementsMatching($rdf.sym(uri))?.length) {
-    throw new Error(`No data on resource ${uri} could be retrieved`);
-  }
-
+  const label = findMatchingPredicate(store, uri, options.labelPredicates);
+  if (!label) return null;
   return {
     uri,
-    label: findMatchingPredicate(store, uri, labelPredicates) || null,
-    description: findMatchingPredicate(store, uri, descriptionPredicates) || null,
+    label,
+    description: findMatchingPredicate(store, uri, options.descriptionPredicates) || null,
   };
+};
+
+const actualFetchResource = async (uri: string, options: FetchResourceOptions): Promise<ResourceData> => {
+  const acceptHeader = Object.keys(acceptedResourceContentTypes).join(', ');
+
+  // 1. Direct
+  let result = await tryFetchAndParse(
+    () => fetch(uri, { headers: { 'Accept': acceptHeader } }),
+    uri, options,
+  );
+
+  // 2. Rainbow proxies (in order)
+  for (const instance of [...toArray(options.fallbackRainbowInstances), ...toArray(options.fallbackRainbowInstance)]) {
+    if (result) break;
+    const rainbowURL = new URL(instance);
+    rainbowURL.searchParams.set('uri', uri);
+    result = await tryFetchAndParse(
+      () => fetch(rainbowURL, { headers: { 'Accept': acceptHeader } }),
+      uri, options,
+    );
+  }
+
+  // 3. SPARQL endpoints (in order)
+  for (const endpoint of [...toArray(options.fallbackSparqlEndpoints), ...toArray(options.fallbackSparqlEndpoint)]) {
+    if (result) break;
+    const formBody = new URLSearchParams({ query: get_sparql_query(uri) });
+    result = await tryFetchAndParse(
+      () => fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-type': 'application/x-www-form-urlencoded', 'Accept': 'text/turtle' },
+        body: formBody.toString(),
+      }),
+      uri, options,
+    );
+  }
+
+  if (!result) {
+    throw new Error(`No label data found for <${uri}>`);
+  }
+  return result;
 };
 
 export async function fetchResource(uri: string, options: Partial<FetchResourceOptions> = {}) {
