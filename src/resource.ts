@@ -1,23 +1,21 @@
 import {loadContext} from "./jsonld";
-import {acceptedResourceContentTypes, descriptionPredicates, labelPredicates} from "./constants";
-import * as $rdf from 'rdflib';
-import {NamedNode} from "rdflib/lib/tf-types";
-import {IndexedFormula} from "rdflib";
+import {descriptionPredicates, labelPredicates} from "./constants";
+import * as N3 from 'n3';
+import * as jsonldLib from 'jsonld';
+import { RdfXmlParser } from 'rdfxml-streaming-parser';
 
 export interface FetchResourceOptions {
-  labelPredicates: (NamedNode | string)[],
-  descriptionPredicates: (NamedNode | string)[],
+  labelPredicates: string[],
+  descriptionPredicates: string[],
   fallbackRainbowInstance?: string,   // deprecated: use fallbackRainbowInstances
   fallbackRainbowInstances?: string | string[],
   fallbackSparqlEndpoint?: string,    // deprecated: use fallbackSparqlEndpoints
   fallbackSparqlEndpoints?: string | string[],
-  acceptedContentTypes: { [contentType: string]: boolean | string },
 }
 
 export const defaultFetchResourceOptions: FetchResourceOptions = {
   labelPredicates,
   descriptionPredicates,
-  acceptedContentTypes: acceptedResourceContentTypes,
 };
 
 export interface CreatePropertiesTableOptions {
@@ -32,27 +30,73 @@ export interface ResourceData {
 
 const fetchResourceCache: { [url: string]: Promise<ResourceData> } = {};
 
-const store = $rdf.graph();
+const N3_CONTENT_TYPES = new Set([
+  'text/turtle',
+  'text/n3',
+  'application/n-triples',
+  'application/n-quads',
+  'application/trig',
+  'text/anot+turtle',
+]);
 
-const findMatchingPredicate = (store: IndexedFormula, resourceUrl: string | NamedNode, predicates: (string | NamedNode)[]) => {
-  if (typeof resourceUrl === "string") {
-    resourceUrl = $rdf.sym(resourceUrl);
+const ACCEPT_HEADER = [
+  'text/turtle',
+  'application/n-triples',
+  'application/n-quads',
+  'application/trig',
+  'application/ld+json',
+  'application/rdf+xml',
+].join(', ');
+
+function findInStore(store: N3.Store, subjectUri: string, predicates: string[]): string | null {
+  const subj = N3.DataFactory.namedNode(subjectUri);
+  for (const predUri of predicates) {
+    const quads = store
+      .getQuads(subj, N3.DataFactory.namedNode(predUri), null, null)
+      .filter(q => q.object.termType === 'Literal');
+    if (!quads.length) continue;
+    const en = quads.find(q => (q.object as N3.Literal).language === 'en');
+    const noLang = quads.find(q => !(q.object as N3.Literal).language);
+    return (en ?? noLang ?? quads[0]).object.value;
   }
-  for (const pred of predicates) {
-    const matching = store.statementsMatching(resourceUrl,
-      typeof pred === 'string' ? $rdf.sym(pred) : pred);
-    if (matching?.length) {
-      return matching[0].object.value;
-    }
-  }
+  return null;
+}
+
+function parseTurtle(text: string, baseIRI: string, contentType: string): Promise<N3.Store> {
+  const store = new N3.Store();
+  const format = contentType === 'text/anot+turtle' ? 'text/turtle' : contentType as any;
+  const parser = new N3.Parser({baseIRI, format});
+  return new Promise((resolve, reject) => {
+    parser.parse(text, (err, quad) => {
+      if (err) return reject(err);
+      if (quad) store.addQuad(quad);
+      else resolve(store);
+    });
+  });
+}
+
+async function parseJsonLd(text: string, baseIRI: string): Promise<N3.Store> {
+  const doc = JSON.parse(text);
+  const nquads = await (jsonldLib as any).toRDF(doc, {format: 'application/n-quads', base: baseIRI});
+  return parseTurtle(nquads, baseIRI, 'application/n-quads');
+}
+
+async function parseRdfXml(text: string, baseIRI: string): Promise<N3.Store> {
+  const store = new N3.Store();
+  return new Promise((resolve, reject) => {
+    const parser = new RdfXmlParser({baseIRI});
+    parser.on('data', (quad: any) => store.addQuad(quad));
+    parser.on('error', reject);
+    parser.on('end', () => resolve(store));
+    parser.write(text);
+    parser.end();
+  });
 }
 
 const toArray = (val?: string | string[]): string[] =>
   !val ? [] : Array.isArray(val) ? val : [val];
 
-const get_sparql_query = (uri: string) => {
-  return `DESCRIBE <${uri}>`;
-}
+const getSparqlQuery = (uri: string) => `DESCRIBE <${uri}>`;
 
 const tryFetchAndParse = async (fetchFn: () => Promise<Response>, uri: string, options: FetchResourceOptions): Promise<ResourceData | null> => {
   let response: Response;
@@ -62,31 +106,35 @@ const tryFetchAndParse = async (fetchFn: () => Promise<Response>, uri: string, o
   } catch {
     return null;
   }
-  const responseContentType = response.headers.get('content-type')?.replace(/;.*/, '') || 'text/turtle';
-  const acceptedContentType = options.acceptedContentTypes[responseContentType] === true
-    ? responseContentType
-    : options.acceptedContentTypes[responseContentType];
-  if (!acceptedContentType) return null;
+  const contentType = response.headers.get('content-type')?.split(';')[0].trim() || 'text/turtle';
+  const text = await response.text();
+  let store: N3.Store;
   try {
-    $rdf.parse(await response.text(), store, uri, acceptedContentType as string);
+    if (N3_CONTENT_TYPES.has(contentType)) {
+      store = await parseTurtle(text, uri, contentType);
+    } else if (contentType === 'application/ld+json') {
+      store = await parseJsonLd(text, uri);
+    } else if (contentType === 'application/rdf+xml') {
+      store = await parseRdfXml(text, uri);
+    } else {
+      return null;
+    }
   } catch {
     return null;
   }
-  const label = findMatchingPredicate(store, uri, options.labelPredicates);
+  const label = findInStore(store, uri, options.labelPredicates);
   if (!label) return null;
   return {
     uri,
     label,
-    description: findMatchingPredicate(store, uri, options.descriptionPredicates) || null,
+    description: findInStore(store, uri, options.descriptionPredicates),
   };
 };
 
 const actualFetchResource = async (uri: string, options: FetchResourceOptions): Promise<ResourceData> => {
-  const acceptHeader = Object.keys(acceptedResourceContentTypes).join(', ');
-
   // 1. Direct
   let result = await tryFetchAndParse(
-    () => fetch(uri, { headers: { 'Accept': acceptHeader } }),
+    () => fetch(uri, {headers: {'Accept': ACCEPT_HEADER}}),
     uri, options,
   );
 
@@ -96,7 +144,7 @@ const actualFetchResource = async (uri: string, options: FetchResourceOptions): 
     const rainbowURL = new URL(instance);
     rainbowURL.searchParams.set('uri', uri);
     result = await tryFetchAndParse(
-      () => fetch(rainbowURL, { headers: { 'Accept': acceptHeader } }),
+      () => fetch(rainbowURL.toString(), {headers: {'Accept': ACCEPT_HEADER}}),
       uri, options,
     );
   }
@@ -104,11 +152,11 @@ const actualFetchResource = async (uri: string, options: FetchResourceOptions): 
   // 3. SPARQL endpoints (in order)
   for (const endpoint of [...toArray(options.fallbackSparqlEndpoints), ...toArray(options.fallbackSparqlEndpoint)]) {
     if (result) break;
-    const formBody = new URLSearchParams({ query: get_sparql_query(uri) });
+    const formBody = new URLSearchParams({query: getSparqlQuery(uri)});
     result = await tryFetchAndParse(
       () => fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-type': 'application/x-www-form-urlencoded', 'Accept': 'text/turtle' },
+        headers: {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'text/turtle, application/n-triples'},
         body: formBody.toString(),
       }),
       uri, options,
