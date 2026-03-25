@@ -136,6 +136,7 @@ const defaultFetchResourceOptions = {
     descriptionPredicates,
 };
 const fetchResourceCache = {};
+const requestCache = {};
 const N3_CONTENT_TYPES = new Set([
     'text/turtle',
     'text/n3',
@@ -159,8 +160,9 @@ function findInStore(store, subjectUri, predicates) {
         const quads = store
             .getQuads(subj, N3__namespace.DataFactory.namedNode(predUri), null, null)
             .filter(q => q.object.termType === 'Literal');
-        if (!quads.length)
+        if (!quads.length) {
             continue;
+        }
         const en = quads.find(q => q.object.language === 'en');
         const noLang = quads.find(q => !q.object.language);
         return ((_a = en !== null && en !== void 0 ? en : noLang) !== null && _a !== void 0 ? _a : quads[0]).object.value;
@@ -173,19 +175,23 @@ function parseTurtle(text, baseIRI, contentType) {
     const parser = new N3__namespace.Parser({ baseIRI, format });
     return new Promise((resolve, reject) => {
         parser.parse(text, (err, quad) => {
-            if (err)
+            if (err) {
                 return reject(err);
-            if (quad)
+            }
+            if (quad) {
                 store.addQuad(quad);
-            else
+            }
+            else {
                 resolve(store);
+            }
         });
     });
 }
 async function parseJsonLd(text, baseIRI) {
     const jsonldMod = await import('jsonld');
-    if (!jsonldMod)
+    if (!jsonldMod) {
         throw new Error('jsonld peer dependency is not available');
+    }
     const doc = JSON.parse(text);
     const nquads = await jsonldMod.toRDF(doc, { format: 'application/n-quads', base: baseIRI });
     return parseTurtle(nquads, baseIRI, 'application/n-quads');
@@ -203,67 +209,78 @@ async function parseRdfXml(text, baseIRI) {
 }
 const toArray = (val) => !val ? [] : Array.isArray(val) ? val : [val];
 const getSparqlQuery = (uri) => `DESCRIBE <${uri}>`;
-const tryFetchAndParse = async (fetchFn, uri, options) => {
+const fetchAndParse = async (fetchFn, baseIRI) => {
     var _a;
     let response;
     try {
         response = await fetchFn();
-        if (!response.ok)
+        if (!response.ok) {
             return null;
+        }
     }
     catch (_b) {
         return null;
     }
     const contentType = ((_a = response.headers.get('content-type')) === null || _a === void 0 ? void 0 : _a.split(';')[0].trim()) || 'text/turtle';
     const text = await response.text();
-    let store;
     try {
         if (N3_CONTENT_TYPES.has(contentType)) {
-            store = await parseTurtle(text, uri, contentType);
+            return parseTurtle(text, baseIRI, contentType);
         }
-        else if (contentType === 'application/ld+json') {
-            store = await parseJsonLd(text, uri);
+        if (contentType === 'application/ld+json') {
+            return parseJsonLd(text, baseIRI);
         }
-        else if (contentType === 'application/rdf+xml') {
-            store = await parseRdfXml(text, uri);
-        }
-        else {
-            return null;
+        if (contentType === 'application/rdf+xml') {
+            return parseRdfXml(text, baseIRI);
         }
     }
     catch (_c) {
+    }
+    return null;
+};
+const fetchAndParseDocument = (docUrl, fetchFn) => {
+    if (!(docUrl in requestCache)) {
+        requestCache[docUrl] = fetchAndParse(fetchFn, docUrl);
+    }
+    return requestCache[docUrl];
+};
+const findResourceInStore = async (storePromise, uri, options) => {
+    const store = await storePromise;
+    if (!store) {
         return null;
     }
     const label = findInStore(store, uri, options.labelPredicates);
-    if (!label)
+    if (!label) {
         return null;
-    return {
-        uri,
-        label,
-        description: findInStore(store, uri, options.descriptionPredicates),
-    };
+    }
+    return { uri, label, description: findInStore(store, uri, options.descriptionPredicates) };
 };
 const actualFetchResource = async (uri, options) => {
-    // 1. Direct
-    let result = await tryFetchAndParse(() => fetch(uri, { headers: { 'Accept': ACCEPT_HEADER } }), uri, options);
-    // 2. Rainbow proxies (in order)
+    const docUrl = uri.includes('#') ? uri.split('#')[0] : uri;
+    // 1. Direct (cached by document URL so hash siblings share one request)
+    let result = await findResourceInStore(fetchAndParseDocument(docUrl, () => fetch(docUrl, { headers: { 'Accept': ACCEPT_HEADER } })), uri, options);
+    // 2. Rainbow proxies (in order) — not supported for hash URIs
+    const isHashUri = uri.includes('#');
     for (const instance of [...toArray(options.fallbackRainbowInstances), ...toArray(options.fallbackRainbowInstance)]) {
-        if (result)
+        if (result || isHashUri) {
             break;
+        }
         const rainbowURL = new URL(instance);
         rainbowURL.searchParams.set('uri', uri);
-        result = await tryFetchAndParse(() => fetch(rainbowURL.toString(), { headers: { 'Accept': ACCEPT_HEADER } }), uri, options);
+        const rainbowUrlStr = rainbowURL.toString();
+        result = await findResourceInStore(fetchAndParseDocument(rainbowUrlStr, () => fetch(rainbowUrlStr, { headers: { 'Accept': ACCEPT_HEADER } })), uri, options);
     }
-    // 3. SPARQL endpoints (in order)
+    // 3. SPARQL endpoints (in order) — each DESCRIBE is unique per URI, no request cache
     for (const endpoint of [...toArray(options.fallbackSparqlEndpoints), ...toArray(options.fallbackSparqlEndpoint)]) {
-        if (result)
+        if (result) {
             break;
+        }
         const formBody = new URLSearchParams({ query: getSparqlQuery(uri) });
-        result = await tryFetchAndParse(() => fetch(endpoint, {
+        result = await findResourceInStore(fetchAndParse(() => fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'text/turtle, application/n-triples' },
             body: formBody.toString(),
-        }), uri, options);
+        }), uri), uri, options);
     }
     if (!result) {
         throw new Error(`No label data found for <${uri}>`);
