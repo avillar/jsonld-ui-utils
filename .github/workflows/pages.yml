@@ -39,6 +39,8 @@ jobs:
           </head>
           <body class="markdown-body">
           $body$
+          <script src="https://cdn.jsdelivr.net/npm/anchor-js@5/anchor.min.js"></script>
+          <script>anchors.add('h1, h2, h3, h4, h5, h6');</script>
           </body>
           </html>
           EOF
