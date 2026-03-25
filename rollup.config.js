@@ -6,6 +6,8 @@ import json from '@rollup/plugin-json';
 import polyfillNode from 'rollup-plugin-polyfill-node';
 import {terser} from "rollup-plugin-terser";
 
+const DIST = process.env.BUILD_DIR ?? 'dist-local';
+
 // IIFE bundles everything; ESM/CJS leaves runtime deps external so consumers' bundlers can deduplicate
 const MODULE_EXTERNALS = ['n3', 'jsonld', 'rdfxml-streaming-parser'];
 const LEAFLET_MODULE_EXTERNALS = ['leaflet', ...MODULE_EXTERNALS];
@@ -76,7 +78,7 @@ const iifePlugins = [
   resolve(),
   json({preferConst: true, compact: true}),
   commonjs({include: /node_modules/, transformMixedEsModules: true}),
-  typescript({tsconfig: "./tsconfig.json", sourceMap: true, inlineSources: true}),
+  typescript({tsconfig: "./tsconfig.json", outDir: DIST, sourceMap: true, inlineSources: true}),
   babel({
     babelHelpers: "bundled",
     presets: [["@babel/preset-env", {targets: "> 0.5%, not dead", useBuiltIns: false}]],
@@ -88,14 +90,14 @@ const modulePlugins = [
   resolve({browser: true, preferBuiltins: false}),
   json({preferConst: true, compact: true}),
   commonjs({include: /node_modules/, transformMixedEsModules: true}),
-  typescript({tsconfig: "./tsconfig.json", sourceMap: true, inlineSources: true}),
+  typescript({tsconfig: "./tsconfig.json", outDir: DIST, sourceMap: true, inlineSources: true}),
 ];
 
 export default [{
   input: "src/index.ts",
   onwarn,
   output: [{
-    file: "dist/jsonld-ui-utils.min.js",
+    file: `${DIST}/jsonld-ui-utils.min.js`,
     format: "iife",
     name: "jsonldUIUtils",
     inlineDynamicImports: true,
@@ -107,8 +109,8 @@ export default [{
   input: "src/index.ts",
   external: MODULE_EXTERNALS,
   output: [
-    {file: "dist/index.esm.js", format: "esm", sourcemap: true},
-    {file: "dist/index.cjs.js", format: "cjs", exports: "named", sourcemap: true},
+    {file: `${DIST}/index.esm.js`, format: "esm", sourcemap: true},
+    {file: `${DIST}/index.cjs.js`, format: "cjs", exports: "named", sourcemap: true},
   ],
   plugins: modulePlugins,
 }, {
@@ -117,7 +119,7 @@ export default [{
   onwarn,
   external: ["leaflet"],
   output: [{
-    file: "dist/jsonld-ui-utils-leaflet.min.js",
+    file: `${DIST}/jsonld-ui-utils-leaflet.min.js`,
     format: "iife",
     name: "jsonldUIUtilsLeaflet",
     globals: {leaflet: "L"},
@@ -131,8 +133,8 @@ export default [{
   input: "src/leaflet.ts",
   external: LEAFLET_MODULE_EXTERNALS,
   output: [
-    {file: "dist/leaflet.esm.js", format: "esm", sourcemap: true},
-    {file: "dist/leaflet.cjs.js", format: "cjs", exports: "named", sourcemap: true},
+    {file: `${DIST}/leaflet.esm.js`, format: "esm", sourcemap: true},
+    {file: `${DIST}/leaflet.cjs.js`, format: "cjs", exports: "named", sourcemap: true},
   ],
   plugins: modulePlugins,
 }];

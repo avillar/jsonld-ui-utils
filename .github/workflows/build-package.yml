@@ -27,7 +27,7 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Build project
-        run: yarn build
+        run: yarn build:release
 
       - name: Pack npm tarball
         run: npm pack && mv opengeospatial-jsonld-ui-utils-*.tgz jsonld-ui-utils.tgz
