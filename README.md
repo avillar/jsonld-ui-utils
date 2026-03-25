@@ -14,12 +14,18 @@ A JavaScript/TypeScript library that renders JSON-LD feature data as interactive
 ## Installation
 
 ```bash
-npm install https://github.com/avillar/jsonld-ui-utils/releases/latest/download/opengeospatial-jsonld-ui-utils.tgz
+npm install github:avillar/jsonld-ui-utils
 # or
-yarn add https://github.com/avillar/jsonld-ui-utils/releases/latest/download/opengeospatial-jsonld-ui-utils.tgz
+yarn add github:avillar/jsonld-ui-utils
 ```
 
-To pin to a specific version, replace `latest/download` with e.g. `download/v0.2.0`.
+To pin to a specific version:
+
+```bash
+npm install github:avillar/jsonld-ui-utils#v0.2.3
+# or
+yarn add github:avillar/jsonld-ui-utils#v0.2.3
+```
 
 ### Optional peer dependencies
 
@@ -168,13 +174,7 @@ const merged = await loadContext([
 
 The Leaflet plugin creates a `L.GeoJSON` layer that automatically renders popup tables for each feature and augments them with RDF metadata.
 
-### Installation
-
-```bash
-npm install https://github.com/avillar/jsonld-ui-utils/releases/latest/download/opengeospatial-jsonld-ui-utils.tgz
-```
-
-Import the plugin entry point:
+Same package as above — no separate install needed. Import the plugin entry point:
 
 ```javascript
 import { createJsonLDGeoJSONLayer } from '@opengeospatial/jsonld-ui-utils/leaflet';
@@ -195,7 +195,7 @@ This exposes `jsonldUIUtilsLeaflet` as a global variable.
 ### Usage
 
 ```javascript
-const layer = createJsonLDGeoJSONLayer(L, geojsonData, {
+const layer = jsonldUIUtilsLeaflet.createJsonLDGeoJSONLayer(L, geojsonData, {
   ldContext: 'https://example.org/context.jsonld',
   popupOptions: { maxWidth: 420 },
   augmentOptions: {
@@ -205,8 +205,6 @@ const layer = createJsonLDGeoJSONLayer(L, geojsonData, {
 
 layer.addTo(map);
 ```
-
-For the IIFE build, call `jsonldUIUtilsLeaflet.createJsonLDGeoJSONLayer(L, data, options)`.
 
 ### Behaviour
 
